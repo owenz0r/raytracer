@@ -19,6 +19,12 @@ public:
 	Light(float intensity, glm::vec3 position )
 		: m_position(position), m_intensity(intensity) {};
 
+	void translate(float x, float y, float z)
+	{
+		glm::vec3 trans(x, y, z);
+		m_position += trans;
+	}
+
 	glm::vec3 position() const { return m_position; }
 	float intensity() const { return m_intensity; }
 };
@@ -110,10 +116,10 @@ int main(int argc, char* args[])
 	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0) ),
 									Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0) ),
 									Sphere(0.5, glm::vec3(1,-0.5,-6), glm::vec3(0,0,255) ),
-									Sphere(500.0, glm::vec3(0,-501,-10 ), glm::vec3(200,200,200), 1.0f, 0.2f),
-									Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.2f),
-									Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.2f),
-									Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.2f) };
+									Sphere(500.0, glm::vec3(0,-501,-10 ), glm::vec3(200,200,200), 1.0f, 0.3f),
+									Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
+									Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.3f),
+									Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f) };
 	std::vector<Light> lights = { Light(1.0f, glm::vec3(-1,5,-5)) };
 									//Light(0.5f, glm::vec3(0,5,-5)) };
 
@@ -238,6 +244,20 @@ int main(int argc, char* args[])
 						{
 							case SDLK_ESCAPE:
 								quit = true;
+								break;
+							case SDLK_w:
+								lights[0].translate(0.0f, 0.0f, -0.1f);
+								break;
+							case SDLK_s:
+								lights[0].translate(0.0f, 0.0f, 0.1f);
+								break;
+							case SDLK_a:
+								lights[0].translate(-0.1f, 0.0f, 0.0f);
+								break;
+							case SDLK_d:
+								lights[0].translate(0.1f, 0.0f, 0.0f);
+								break;
+
 						}
 					}
 				}
