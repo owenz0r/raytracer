@@ -95,10 +95,13 @@ void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned sho
 int main(int argc, char* args[])
 {
 	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0) ),
-									Sphere(0.5, glm::vec3(-2,-0.5,-8), glm::vec3(0,255,0) ),
-									Sphere(0.5, glm::vec3(1,-0.6,-6), glm::vec3(0,0,255) ),
-									Sphere(50.0, glm::vec3(0,-51,-10 ), glm::vec3(255,255,255)) };
-	std::vector<Light> lights = { Light(1.0f, glm::vec3(0,5,-5)) };
+									Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0) ),
+									Sphere(0.5, glm::vec3(1,-0.5,-6), glm::vec3(0,0,255) ),
+									Sphere(500.0, glm::vec3(0,-501,-10 ), glm::vec3(200,200,200)),
+									Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200)),
+									Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200)),
+									Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200)) };
+	std::vector<Light> lights = { Light(1.0f, glm::vec3(-1,5,-5)) };
 									//Light(0.5f, glm::vec3(0,5,-5)) };
 
 	SDL_Window* window = NULL;
@@ -144,6 +147,8 @@ int main(int argc, char* args[])
 						raydir = glm::normalize(raydir);
 						Ray ray(glm::vec3(0, 0, 0), raydir);
 						
+						float diffuse_scale = 1.0f;
+						float specular_scale = 0.6f;
 						double dist = 0;
 						double dot = 0;
 						Sphere *closest = NULL;
@@ -198,7 +203,7 @@ int main(int argc, char* args[])
 
 							specular = glm::clamp(specular, 0.0f, 1.0f);
 							diffuse = glm::clamp(diffuse, 0.0f, 1.0f);
-							glm::vec3 final_colour = (closest->colour() * diffuse) + (specular * glm::vec3(255,255,255));
+							glm::vec3 final_colour = (closest->colour() * diffuse * diffuse_scale) + (specular * glm::vec3(255,255,255) * specular_scale);
 							final_colour = glm::clamp(final_colour, glm::vec3(0,0,0), glm::vec3(255,255,255));
 							setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
 						}
