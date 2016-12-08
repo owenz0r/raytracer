@@ -39,10 +39,21 @@ class Sphere {
 	double m_radius;
 	glm::vec3 m_position;
 	glm::vec3 m_colour;
+	float m_diffuse;
+	float m_specular;
 
 public:
+	Sphere(double radius, glm::vec3 position, glm::vec3 colour,
+			float diffuse, float specular)
+		: m_radius(radius), m_position(position), m_colour(colour),
+			m_diffuse(diffuse), m_specular(specular) {}
+
 	Sphere(double radius, glm::vec3 position, glm::vec3 colour)
-		: m_radius(radius), m_position(position), m_colour(colour) {}
+		: m_radius(radius), m_position(position), m_colour(colour)
+	{
+		m_diffuse = 1.0f;
+		m_specular = 1.0f;
+	}
 
 	double intersect( const Ray &ray ) const {
 		glm::vec3 op = m_position - ray.origin();
@@ -71,6 +82,8 @@ public:
 	double radius() const { return m_radius; }
 	glm::vec3 position() const { return m_position; }
 	glm::vec3 colour() const { return m_colour; }
+	float diffuse() const { return m_diffuse; }
+	float specular() const { return m_specular; }
 };
 
 void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned short g, unsigned short b, unsigned short a=255)
@@ -97,10 +110,10 @@ int main(int argc, char* args[])
 	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0) ),
 									Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0) ),
 									Sphere(0.5, glm::vec3(1,-0.5,-6), glm::vec3(0,0,255) ),
-									Sphere(500.0, glm::vec3(0,-501,-10 ), glm::vec3(200,200,200)),
-									Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200)),
-									Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200)),
-									Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200)) };
+									Sphere(500.0, glm::vec3(0,-501,-10 ), glm::vec3(200,200,200), 1.0f, 0.2f),
+									Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.2f),
+									Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.2f),
+									Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.2f) };
 	std::vector<Light> lights = { Light(1.0f, glm::vec3(-1,5,-5)) };
 									//Light(0.5f, glm::vec3(0,5,-5)) };
 
@@ -203,7 +216,8 @@ int main(int argc, char* args[])
 
 							specular = glm::clamp(specular, 0.0f, 1.0f);
 							diffuse = glm::clamp(diffuse, 0.0f, 1.0f);
-							glm::vec3 final_colour = (closest->colour() * diffuse * diffuse_scale) + (specular * glm::vec3(255,255,255) * specular_scale);
+							glm::vec3 final_colour = (closest->colour() * closest->diffuse() * diffuse * diffuse_scale) 
+								+ (specular * closest->specular() * glm::vec3(255,255,255) * specular_scale);
 							final_colour = glm::clamp(final_colour, glm::vec3(0,0,0), glm::vec3(255,255,255));
 							setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
 						}
