@@ -95,6 +95,8 @@ void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned sho
 int main(int argc, char* args[])
 {
 	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0) ),
+									Sphere(0.5, glm::vec3(-2,-0.5,-8), glm::vec3(0,255,0) ),
+									Sphere(0.5, glm::vec3(1,-0.6,-6), glm::vec3(0,0,255) ),
 									Sphere(50.0, glm::vec3(0,-51,-10 ), glm::vec3(255,255,255)) };
 	std::vector<Light> lights = { Light(1.0f, glm::vec3(0,5,-5)) };
 									//Light(0.5f, glm::vec3(0,5,-5)) };
