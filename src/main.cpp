@@ -96,8 +96,8 @@ int main(int argc, char* args[])
 {
 	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0) ),
 									Sphere(50.0, glm::vec3(0,-51,-10 ), glm::vec3(255,255,255)) };
-	std::vector<Light> lights = { Light(1.0f, glm::vec3(0,5,-10)) };
-									//Light(0.5f, glm::vec3(0,5,-5)) };
+	std::vector<Light> lights = { Light(1.0f, glm::vec3(0,5,-10)),
+									Light(0.5f, glm::vec3(0,5,-5)) };
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
@@ -163,10 +163,11 @@ int main(int argc, char* args[])
 							dot = 0;
 							float bias = 1e-4;
 							glm::vec3 contact_point(ray.origin() + (ray.direction() * (float)closest_dist));
-							contact_point = contact_point + (bias * (contact_point - closest->position()));
+							glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
+							contact_point = contact_point + (bias * sphere_normal);
 
 							
-							float illumination = 0.0f;
+							float illumination = 0.0f, specular = 0.0f;
 							// check lights on contact point
 							for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
 							{		
@@ -189,7 +190,10 @@ int main(int argc, char* args[])
 								if (!in_shadow)
 								{
 									dot = glm::dot(lightdir_normalized, glm::normalize(contact_point - closest->position())) * light->intensity();
-									illumination += glm::abs(dot);
+									float specular = glm::dot(ray.direction(), glm::reflect(lightdir_normalized, sphere_normal));
+									specular = glm::pow(specular, 50);
+									float diffuse = abs(dot);
+									illumination += specular + diffuse;
 								}
 							}
 
