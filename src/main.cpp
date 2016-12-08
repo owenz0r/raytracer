@@ -38,10 +38,11 @@ public:
 class Sphere {
 	double m_radius;
 	glm::vec3 m_position;
+	glm::vec3 m_colour;
 
 public:
-	Sphere(double radius, glm::vec3 position)
-		: m_radius(radius), m_position(position) {}
+	Sphere(double radius, glm::vec3 position, glm::vec3 colour)
+		: m_radius(radius), m_position(position), m_colour(colour) {}
 
 	double intersect( const Ray &ray ) const {
 		glm::vec3 op = m_position - ray.origin();
@@ -69,6 +70,7 @@ public:
 
 	double radius() const { return m_radius; }
 	glm::vec3 position() const { return m_position; }
+	glm::vec3 colour() const { return m_colour; }
 };
 
 void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned short g, unsigned short b, unsigned short a=255)
@@ -92,10 +94,10 @@ void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned sho
 
 int main(int argc, char* args[])
 {
-	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10)),
-									Sphere(50.0, glm::vec3(0,-51,-10 )) };
-	std::vector<Light> lights = { Light( 0.5f, glm::vec3(0,5,-10)),
-									Light(0.5f, glm::vec3(0,5,-5)) };
+	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0) ),
+									Sphere(50.0, glm::vec3(0,-51,-10 ), glm::vec3(255,255,255)) };
+	std::vector<Light> lights = { Light(1.0f, glm::vec3(0,5,-10)) };
+									//Light(0.5f, glm::vec3(0,5,-5)) };
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
@@ -187,13 +189,14 @@ int main(int argc, char* args[])
 								if (!in_shadow)
 								{
 									dot = glm::dot(lightdir_normalized, glm::normalize(contact_point - closest->position())) * light->intensity();
-									illumination += glm::abs(dot) * 255;
+									illumination += glm::abs(dot);
 								}
 							}
-							
-							
-							int colour = glm::clamp((int)illumination, 0, 255);
-							setPixel(screenSurface, x, y, colour, colour, colour);
+
+							illumination = glm::clamp(illumination, 0.0f, 1.0f);
+							glm::vec3 final_colour = closest->colour() * illumination;
+							final_colour = glm::clamp(final_colour, glm::vec3(0,0,0), glm::vec3(255,255,255));
+							setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
 						}
 					}
 				}
