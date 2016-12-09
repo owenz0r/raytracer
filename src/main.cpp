@@ -11,24 +11,6 @@
 const int SCREEN_WIDTH = 1024;
 const int SCREEN_HEIGHT = 768;
 
-class Light {
-	glm::vec3 m_position;
-	float m_intensity;
-
-public:
-	Light(float intensity, glm::vec3 position )
-		: m_position(position), m_intensity(intensity) {};
-
-	void translate(float x, float y, float z)
-	{
-		glm::vec3 trans(x, y, z);
-		m_position += trans;
-	}
-
-	glm::vec3 position() const { return m_position; }
-	float intensity() const { return m_intensity; }
-};
-
 class Ray {
 	glm::vec3 m_origin;
 	glm::vec3 m_direction;
@@ -85,12 +67,29 @@ public:
 		}
 	}
 
+	void translate(float x, float y, float z)
+	{
+		glm::vec3 trans(x, y, z);
+		m_position += trans;
+	}
+
 	double radius() const { return m_radius; }
 	glm::vec3 position() const { return m_position; }
 	glm::vec3 colour() const { return m_colour; }
 	float diffuse() const { return m_diffuse; }
 	float specular() const { return m_specular; }
 };
+
+class Light : public Sphere {
+	float m_intensity;
+
+public:
+	Light(float intensity, glm::vec3 position)
+		: Sphere(0.2f, position, glm::vec3(255, 255, 0)), m_intensity(intensity) {};
+
+	float intensity() const { return m_intensity; }
+};
+
 
 void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned short g, unsigned short b, unsigned short a=255)
 {
