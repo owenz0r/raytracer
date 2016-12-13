@@ -95,7 +95,7 @@ class Light : public Sphere {
 
 public:
 	Light(float intensity, glm::vec3 position)
-		: Sphere(0.2f, position, glm::vec3(255, 255, 0)), m_intensity(intensity) {};
+		: Sphere(0.05f, position, glm::vec3(255, 255, 0)), m_intensity(intensity) {};
 
 	float intensity() const { return m_intensity; }
 };
@@ -120,24 +120,30 @@ void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned sho
 	pixels[(y * surface->w) + x] = pixel;
 }
 
-int main(int argc, char* args[])
+void setup_scene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
 {
-	std::vector<Sphere> spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0) ),
-									Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0) ),
-									Sphere(0.5, glm::vec3(1,-0.5,-6), glm::vec3(0,0,255) ),
-									Sphere(500.0, glm::vec3(0,-501,-10 ), glm::vec3(200,200,200), 1.0f, 0.3f),
-									Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
-									Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.3f),
-									Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f) };
-	std::vector<Light> lights = { Light(1.0f, glm::vec3(-1,1,-5)) };
-									//Light(0.5f, glm::vec3(0,5,-5)) };
+	spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0)),
+		Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0)),
+		Sphere(0.5, glm::vec3(1,-0.5,-6), glm::vec3(0,0,255)),
+		Sphere(500.0, glm::vec3(0,-501,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
+		Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
+		Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.3f),
+		Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f) };
+	lights = { Light(1.0f, glm::vec3(-1,1,-5)) };
+	//Light(0.5f, glm::vec3(0,5,-5)) };
 
-	std::vector<Renderable*> render_objects;
 	for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
-		render_objects.push_back( &(*sphere) );
+		render_objects.push_back(&(*sphere));
 	for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
 		render_objects.push_back(&(*light));
+}
 
+int main(int argc, char* args[])
+{
+	std::vector<Sphere> spheres;
+	std::vector<Light> lights;
+	std::vector<Renderable*> render_objects;
+	setup_scene(spheres, lights, render_objects);
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
@@ -185,7 +191,6 @@ int main(int argc, char* args[])
 						float diffuse_scale = 1.0f;
 						float specular_scale = 0.6f;
 						double dist = 0;
-						double dot = 0;
 						Renderable *closest = NULL;
 						double closest_dist = 9999;
 
@@ -204,7 +209,6 @@ int main(int argc, char* args[])
 						// found closest sphere to draw
 						if (closest)
 						{
-							dot = 0;
 							float bias = 1e-4;
 							glm::vec3 contact_point(ray.origin() + (ray.direction() * (float)closest_dist));
 							glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
