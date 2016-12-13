@@ -11,6 +11,7 @@
 const int SCREEN_WIDTH = 1024;
 const int SCREEN_HEIGHT = 768;
 
+
 class Ray {
 	glm::vec3 m_origin;
 	glm::vec3 m_direction;
@@ -23,7 +24,16 @@ public:
 	glm::vec3 direction() const { return m_direction; }
 };
 
-class Sphere {
+class Renderable {
+public:
+	virtual double intersect(const Ray &ray) const = 0;
+	virtual glm::vec3 position() const = 0;
+	virtual glm::vec3 colour() const = 0;
+	virtual float diffuse() const = 0;
+	virtual float specular() const = 0;
+};
+
+class Sphere : public Renderable {
 	double m_radius;
 	glm::vec3 m_position;
 	glm::vec3 m_colour;
@@ -40,7 +50,7 @@ public:
 		: m_radius(radius), m_position(position), m_colour(colour)
 	{
 		m_diffuse = 1.0f;
-		m_specular = 1.0f;
+		m_specular = 0.0f;
 	}
 
 	double intersect( const Ray &ray ) const {
@@ -119,8 +129,15 @@ int main(int argc, char* args[])
 									Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
 									Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.3f),
 									Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f) };
-	std::vector<Light> lights = { Light(1.0f, glm::vec3(-1,5,-5)) };
+	std::vector<Light> lights = { Light(1.0f, glm::vec3(-1,1,-5)) };
 									//Light(0.5f, glm::vec3(0,5,-5)) };
+
+	std::vector<Renderable*> render_objects;
+	for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
+		render_objects.push_back( &(*sphere) );
+	for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
+		render_objects.push_back(&(*light));
+
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
@@ -169,15 +186,17 @@ int main(int argc, char* args[])
 						float specular_scale = 0.6f;
 						double dist = 0;
 						double dot = 0;
-						Sphere *closest = NULL;
+						Renderable *closest = NULL;
 						double closest_dist = 9999;
-						// loop spheres
-						for (std::vector<Sphere>::iterator it = spheres.begin(); it < spheres.end(); ++it)
+
+						// loop render objects
+						for (std::vector<Renderable*>::iterator obj = render_objects.begin(); obj < render_objects.end(); ++obj)
 						{
-							dist = it->intersect(ray);
+							Renderable* object = (*obj);
+							dist = object->intersect(ray);
 							if (dist > 0 && dist < closest_dist )
 							{
-								closest = &(*it);
+								closest = object;
 								closest_dist = dist;	
 							}
 						}
