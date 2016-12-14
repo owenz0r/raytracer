@@ -120,7 +120,7 @@ void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned sho
 	pixels[(y * surface->w) + x] = pixel;
 }
 
-void setup_scene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
+void setupScene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
 {
 	spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0)),
 		Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0)),
@@ -139,22 +139,27 @@ void setup_scene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::
 		render_objects.push_back(&(*light));
 }
 
+Ray createRay(int x, int y, float invWidth, float invHeight, float aspectratio, float angle)
+{
+	float xx = (2 * ((x + 0.5) * invWidth) - 1) * angle * aspectratio;
+	float yy = (1 - 2 * ((y + 0.5) * invHeight)) * angle;
+	glm::vec3 raydir(xx, yy, -1);
+	raydir = glm::normalize(raydir);
+	Ray ray(glm::vec3(0, 0, 0), raydir);
+	return ray;
+}
+
 void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
 {
 	float invWidth = 1 / float(SCREEN_WIDTH), invHeight = 1 / float(SCREEN_HEIGHT);
 	float fov = 30, aspectratio = SCREEN_WIDTH / float(SCREEN_HEIGHT);
 	float angle = tan(PI * 0.5 * fov / 180.0);
-	float maxdist = 20;
 
 	for (int y = 0; y < SCREEN_HEIGHT; ++y)
 	{
 		for (int x = 0; x < SCREEN_WIDTH; ++x)
 		{
-			float xx = (2 * ((x + 0.5) * invWidth) - 1) * angle * aspectratio;
-			float yy = (1 - 2 * ((y + 0.5) * invHeight)) * angle;
-			glm::vec3 raydir(xx, yy, -1);
-			raydir = glm::normalize(raydir);
-			Ray ray(glm::vec3(0, 0, 0), raydir);
+			Ray ray = createRay(x, y, invWidth, invHeight, aspectratio, angle);
 
 			Renderable *closest = NULL;
 			float diffuse_scale = 1.0f;
@@ -225,7 +230,7 @@ int main(int argc, char* args[])
 	std::vector<Sphere> spheres;
 	std::vector<Light> lights;
 	std::vector<Renderable*> render_objects;
-	setup_scene(spheres, lights, render_objects);
+	setupScene(spheres, lights, render_objects);
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
