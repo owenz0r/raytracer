@@ -139,7 +139,7 @@ void setupScene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::v
 		render_objects.push_back(&(*light));
 }
 
-Ray createRay(int x, int y, float invWidth, float invHeight, float aspectratio, float angle)
+Ray createCameraRay(int x, int y, float invWidth, float invHeight, float aspectratio, float angle)
 {
 	float xx = (2 * ((x + 0.5) * invWidth) - 1) * angle * aspectratio;
 	float yy = (1 - 2 * ((y + 0.5) * invHeight)) * angle;
@@ -167,6 +167,60 @@ Renderable* findClosestObject(std::vector<Renderable*> &render_objects, Ray &ray
 	return closest;
 }
 
+bool isInShadow(std::vector<Sphere> &spheres, Ray &lightray, float lightdir_length)
+{
+	// shadow check
+	bool in_shadow = false;
+	for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
+	{
+		float dist = sphere->intersect(lightray);
+		if (dist > 0 && dist < lightdir_length)
+		{
+			in_shadow = true;
+			break;
+		}
+	}
+	return in_shadow;
+}
+
+void calcIllumination(std::vector<Light> &lights, 
+							std::vector<Sphere> &spheres,
+							Ray &ray,
+							Renderable* closest, 
+							glm::vec3 &contact_point, 
+							glm::vec3 &sphere_normal,
+							float &diffuse,
+							float & specular)
+{
+	// check lights on contact point
+	for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
+	{
+		glm::vec3 lightdir(contact_point - light->position());
+		glm::vec3 lightdir_normalized = glm::normalize(lightdir);
+		float lightdir_length = glm::length(lightdir);
+		Ray lightray(light->position(), lightdir_normalized);
+
+		// shadow check
+		if (!isInShadow(spheres, lightray, lightdir_length))
+		{
+			diffuse += abs(glm::dot(lightdir_normalized, glm::normalize(contact_point - closest->position())) * light->intensity());
+			specular += glm::pow(glm::dot(ray.direction(), glm::reflect(lightdir_normalized, sphere_normal)), 20);
+		}
+	}
+}
+
+glm::vec3 calcFinalColour(Renderable* closest, float specular, float diffuse)
+{
+	float diffuse_scale = 1.0f;
+	float specular_scale = 0.6f;
+	specular = glm::clamp(specular, 0.0f, 1.0f);
+	diffuse = glm::clamp(diffuse, 0.0f, 1.0f);
+	glm::vec3 final_colour = (closest->colour() * closest->diffuse() * diffuse * diffuse_scale)
+		+ (specular * closest->specular() * glm::vec3(255, 255, 255) * specular_scale);
+	final_colour = glm::clamp(final_colour, glm::vec3(0, 0, 0), glm::vec3(255, 255, 255));
+	return final_colour;
+}
+
 void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
 {
 	float invWidth = 1 / float(SCREEN_WIDTH), invHeight = 1 / float(SCREEN_HEIGHT);
@@ -177,10 +231,9 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 	{
 		for (int x = 0; x < SCREEN_WIDTH; ++x)
 		{
-			Ray ray = createRay(x, y, invWidth, invHeight, aspectratio, angle);
+			Ray ray = createCameraRay(x, y, invWidth, invHeight, aspectratio, angle);
 
-			float diffuse_scale = 1.0f;
-			float specular_scale = 0.6f;
+			
 			float closest_dist = std::numeric_limits<float>::max();
 			Renderable *closest = findClosestObject(render_objects, ray, closest_dist);
 
@@ -188,42 +241,14 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 			if (closest)
 			{
 				float bias = 1e-4;
-				glm::vec3 contact_point(ray.origin() + (ray.direction() * (float)closest_dist));
+				glm::vec3 contact_point(ray.origin() + (ray.direction() * closest_dist));
 				glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
 				contact_point = contact_point + (bias * sphere_normal);
 
 				float specular = 0.0f, diffuse = 0.0f;
-				// check lights on contact point
-				for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
-				{
-					glm::vec3 lightdir(contact_point - light->position());
-					glm::vec3 lightdir_normalized = glm::normalize(lightdir);
-					float lightdir_length = glm::length(lightdir);
-					Ray lightray(light->position(), lightdir_normalized);
+				calcIllumination(lights, spheres, ray, closest, contact_point, sphere_normal, diffuse, specular);
 
-					// shadow check
-					bool in_shadow = false;
-					for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
-					{
-						float dist = sphere->intersect(lightray);
-						if (dist > 0 && dist < lightdir_length)
-						{
-							in_shadow = true;
-							break;
-						}
-					}
-					if (!in_shadow)
-					{
-						diffuse += abs(glm::dot(lightdir_normalized, glm::normalize(contact_point - closest->position())) * light->intensity());
-						specular += glm::pow(glm::dot(ray.direction(), glm::reflect(lightdir_normalized, sphere_normal)), 20);
-					}
-				}
-
-				specular = glm::clamp(specular, 0.0f, 1.0f);
-				diffuse = glm::clamp(diffuse, 0.0f, 1.0f);
-				glm::vec3 final_colour = (closest->colour() * closest->diffuse() * diffuse * diffuse_scale)
-					+ (specular * closest->specular() * glm::vec3(255, 255, 255) * specular_scale);
-				final_colour = glm::clamp(final_colour, glm::vec3(0, 0, 0), glm::vec3(255, 255, 255));
+				glm::vec3 final_colour = calcFinalColour(closest, specular, diffuse);
 				setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
 			}
 		}
