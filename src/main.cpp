@@ -149,6 +149,24 @@ Ray createRay(int x, int y, float invWidth, float invHeight, float aspectratio, 
 	return ray;
 }
 
+Renderable* findClosestObject(std::vector<Renderable*> &render_objects, Ray &ray, float &closest_dist)
+{
+	float dist = 0.0f;
+	Renderable *closest = NULL;
+	// loop render objects
+	for (std::vector<Renderable*>::iterator obj = render_objects.begin(); obj < render_objects.end(); ++obj)
+	{
+		Renderable* object = (*obj);
+		dist = object->intersect(ray);
+		if (dist > 0 && dist < closest_dist)
+		{
+			closest = object;
+			closest_dist = dist;
+		}
+	}
+	return closest;
+}
+
 void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
 {
 	float invWidth = 1 / float(SCREEN_WIDTH), invHeight = 1 / float(SCREEN_HEIGHT);
@@ -161,23 +179,10 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 		{
 			Ray ray = createRay(x, y, invWidth, invHeight, aspectratio, angle);
 
-			Renderable *closest = NULL;
 			float diffuse_scale = 1.0f;
 			float specular_scale = 0.6f;
-			float dist = 0;
 			float closest_dist = std::numeric_limits<float>::max();
-
-			// loop render objects
-			for (std::vector<Renderable*>::iterator obj = render_objects.begin(); obj < render_objects.end(); ++obj)
-			{
-				Renderable* object = (*obj);
-				dist = object->intersect(ray);
-				if (dist > 0 && dist < closest_dist)
-				{
-					closest = object;
-					closest_dist = dist;
-				}
-			}
+			Renderable *closest = findClosestObject(render_objects, ray, closest_dist);
 
 			// found closest sphere to draw
 			if (closest)
