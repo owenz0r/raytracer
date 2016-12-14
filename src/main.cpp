@@ -233,7 +233,6 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 		{
 			Ray ray = createCameraRay(x, y, invWidth, invHeight, aspectratio, angle);
 
-			
 			float closest_dist = std::numeric_limits<float>::max();
 			Renderable *closest = findClosestObject(render_objects, ray, closest_dist);
 
