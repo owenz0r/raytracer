@@ -181,8 +181,7 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 				glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
 				contact_point = contact_point + (bias * sphere_normal);
 
-
-				float illumination = 0.0f, specular = 0.0f, diffuse = 0.0f;
+				float specular = 0.0f, diffuse = 0.0f;
 				// check lights on contact point
 				for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
 				{
