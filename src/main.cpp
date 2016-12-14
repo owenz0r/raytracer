@@ -26,7 +26,7 @@ public:
 
 class Renderable {
 public:
-	virtual double intersect(const Ray &ray) const = 0;
+	virtual float intersect(const Ray &ray) const = 0;
 	virtual glm::vec3 position() const = 0;
 	virtual glm::vec3 colour() const = 0;
 	virtual float diffuse() const = 0;
@@ -34,30 +34,30 @@ public:
 };
 
 class Sphere : public Renderable {
-	double m_radius;
+	float m_radius;
 	glm::vec3 m_position;
 	glm::vec3 m_colour;
 	float m_diffuse;
 	float m_specular;
 
 public:
-	Sphere(double radius, glm::vec3 position, glm::vec3 colour,
+	Sphere(float radius, glm::vec3 position, glm::vec3 colour,
 			float diffuse, float specular)
 		: m_radius(radius), m_position(position), m_colour(colour),
 			m_diffuse(diffuse), m_specular(specular) {}
 
-	Sphere(double radius, glm::vec3 position, glm::vec3 colour)
+	Sphere(float radius, glm::vec3 position, glm::vec3 colour)
 		: m_radius(radius), m_position(position), m_colour(colour)
 	{
 		m_diffuse = 1.0f;
 		m_specular = 0.0f;
 	}
 
-	double intersect( const Ray &ray ) const {
+	float intersect( const Ray &ray ) const {
 		glm::vec3 op = m_position - ray.origin();
-		double t, eps = 1e-4;
-		double b = glm::dot(op, ray.direction());
-		double det = b*b - glm::dot(op, op) + m_radius * m_radius;
+		float t, eps = 1e-4;
+		float b = glm::dot(op, ray.direction());
+		float det = b*b - glm::dot(op, op) + m_radius * m_radius;
 		if (det < 0) {
 			return 0;
 		} else {
@@ -83,7 +83,7 @@ public:
 		m_position += trans;
 	}
 
-	double radius() const { return m_radius; }
+	float radius() const { return m_radius; }
 	glm::vec3 position() const { return m_position; }
 	glm::vec3 colour() const { return m_colour; }
 	float diffuse() const { return m_diffuse; }
@@ -125,6 +125,7 @@ void setup_scene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::
 	spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0)),
 		Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0)),
 		Sphere(0.5, glm::vec3(1,-0.5,-6), glm::vec3(0,0,255)),
+		// walls
 		Sphere(500.0, glm::vec3(0,-501,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
 		Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
 		Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.3f),
@@ -155,11 +156,11 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 			raydir = glm::normalize(raydir);
 			Ray ray(glm::vec3(0, 0, 0), raydir);
 
+			Renderable *closest = NULL;
 			float diffuse_scale = 1.0f;
 			float specular_scale = 0.6f;
-			double dist = 0;
-			Renderable *closest = NULL;
-			double closest_dist = 9999;
+			float dist = 0;
+			float closest_dist = std::numeric_limits<float>::max();
 
 			// loop render objects
 			for (std::vector<Renderable*>::iterator obj = render_objects.begin(); obj < render_objects.end(); ++obj)
