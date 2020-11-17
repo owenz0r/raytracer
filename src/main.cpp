@@ -33,6 +33,8 @@ public:
 	virtual float specular() const = 0;
 };
 
+typedef std::shared_ptr<Renderable> RenderableRef;
+
 class Sphere : public Renderable {
 	float m_radius;
 	glm::vec3 m_position;
@@ -90,6 +92,8 @@ public:
 	float specular() const { return m_specular; }
 };
 
+typedef std::shared_ptr<Sphere> SphereRef;
+
 class Light : public Sphere {
 	float m_intensity;
 
@@ -100,6 +104,7 @@ public:
 	float intensity() const { return m_intensity; }
 };
 
+typedef std::shared_ptr<Light> LightRef;
 
 void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned short g, unsigned short b, unsigned short a=255)
 {
@@ -120,23 +125,23 @@ void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned sho
 	pixels[(y * surface->w) + x] = pixel;
 }
 
-void setupScene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
+void setupScene(std::vector<SphereRef> &spheres, std::vector<LightRef> &lights, std::vector<RenderableRef> &render_objects)
 {
-	spheres = { Sphere(1.0, glm::vec3(0,0,-10), glm::vec3(255,0,0)),
-		Sphere(0.5, glm::vec3(-1.5,-0.5,-8), glm::vec3(0,255,0)),
-		Sphere(0.5, glm::vec3(1,-0.5,-6), glm::vec3(0,0,255)),
-		// walls
-		Sphere(500.0, glm::vec3(0,-501,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
-		Sphere(500.0, glm::vec3(-503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f),
-		Sphere(500.0, glm::vec3(0, 0,-515), glm::vec3(200,200,200), 1.0f, 0.3f),
-		Sphere(500.0, glm::vec3(503, 0,-10), glm::vec3(200,200,200), 1.0f, 0.3f) };
-	lights = { Light(1.0f, glm::vec3(-1,1,-5)) };
-	//Light(0.5f, glm::vec3(0,5,-5)) };
+	spheres.push_back(std::make_shared<Sphere>(1.0, glm::vec3(0, 0, -10), glm::vec3(255, 0, 0)));
+	spheres.push_back(std::make_shared<Sphere>(0.5, glm::vec3(-1.5, -0.5, -8), glm::vec3(0, 255, 0)));
+	spheres.push_back(std::make_shared<Sphere>(0.5, glm::vec3(1, -0.5, -6), glm::vec3(0, 0, 255)));
+	// walls
+	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(0, -501, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
+	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(-503, 0, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
+	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(0, 0, -515), glm::vec3(200, 200, 200), 1.0f, 0.3f));
+	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(503, 0, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
 
-	for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
-		render_objects.push_back(&(*sphere));
-	for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
-		render_objects.push_back(&(*light));
+	lights.push_back(std::make_shared<Light>(1.0f, glm::vec3(-1, 1, -5)));
+
+	for (auto sphere : spheres)
+		render_objects.push_back(sphere);
+	for (auto light : lights)
+		render_objects.push_back(light);
 }
 
 Ray createCameraRay(int x, int y, float invWidth, float invHeight, float aspectratio, float angle)
@@ -149,14 +154,12 @@ Ray createCameraRay(int x, int y, float invWidth, float invHeight, float aspectr
 	return ray;
 }
 
-Renderable* findClosestObject(std::vector<Renderable*> &render_objects, Ray &ray, float &closest_dist)
+RenderableRef findClosestObject(std::vector<RenderableRef> &render_objects, Ray &ray, float &closest_dist)
 {
 	float dist = 0.0f;
-	Renderable *closest = NULL;
+	RenderableRef closest;
 	// loop render objects
-	for (std::vector<Renderable*>::iterator obj = render_objects.begin(); obj < render_objects.end(); ++obj)
-	{
-		Renderable* object = (*obj);
+	for (auto object : render_objects) {
 		dist = object->intersect(ray);
 		if (dist > 0 && dist < closest_dist)
 		{
@@ -167,11 +170,12 @@ Renderable* findClosestObject(std::vector<Renderable*> &render_objects, Ray &ray
 	return closest;
 }
 
-bool isInShadow(std::vector<Sphere> &spheres, Ray &lightray, float lightdir_length)
+bool isInShadow(std::vector<SphereRef> &spheres, Ray &lightray, float lightdir_length)
 {
 	// shadow check
 	bool in_shadow = false;
-	for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
+	//for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
+	for (auto sphere : spheres)
 	{
 		float dist = sphere->intersect(lightray);
 		if (dist > 0 && dist < lightdir_length)
@@ -183,17 +187,17 @@ bool isInShadow(std::vector<Sphere> &spheres, Ray &lightray, float lightdir_leng
 	return in_shadow;
 }
 
-void calcIllumination(std::vector<Light> &lights, 
-							std::vector<Sphere> &spheres,
+void calcIllumination(std::vector<LightRef> &lights, 
+							std::vector<SphereRef> &spheres,
 							Ray &ray,
-							Renderable* closest, 
+							RenderableRef closest, 
 							glm::vec3 &contact_point, 
 							glm::vec3 &sphere_normal,
 							float &diffuse,
 							float & specular)
 {
 	// check lights on contact point
-	for (std::vector<Light>::iterator light = lights.begin(); light < lights.end(); ++light)
+	for (auto light : lights)
 	{
 		glm::vec3 lightdir(contact_point - light->position());
 		glm::vec3 lightdir_normalized = glm::normalize(lightdir);
@@ -209,7 +213,7 @@ void calcIllumination(std::vector<Light> &lights,
 	}
 }
 
-glm::vec3 calcFinalColour(Renderable* closest, float specular, float diffuse)
+glm::vec3 calcFinalColour(RenderableRef closest, float specular, float diffuse)
 {
 	float diffuse_scale = 1.0f;
 	float specular_scale = 0.6f;
@@ -221,7 +225,7 @@ glm::vec3 calcFinalColour(Renderable* closest, float specular, float diffuse)
 	return final_colour;
 }
 
-void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
+void raytrace(SDL_Surface* screenSurface, std::vector<SphereRef> &spheres, std::vector<LightRef> &lights, std::vector<RenderableRef> &render_objects)
 {
 	float invWidth = 1 / float(SCREEN_WIDTH), invHeight = 1 / float(SCREEN_HEIGHT);
 	float fov = 30, aspectratio = SCREEN_WIDTH / float(SCREEN_HEIGHT);
@@ -234,7 +238,7 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 			Ray ray = createCameraRay(x, y, invWidth, invHeight, aspectratio, angle);
 
 			float closest_dist = std::numeric_limits<float>::max();
-			Renderable *closest = findClosestObject(render_objects, ray, closest_dist);
+			RenderableRef closest = findClosestObject(render_objects, ray, closest_dist);
 
 			// found closest sphere to draw
 			if (closest)
@@ -256,9 +260,9 @@ void raytrace(SDL_Surface* screenSurface, std::vector<Sphere> &spheres, std::vec
 
 int main(int argc, char* args[])
 {
-	std::vector<Sphere> spheres;
-	std::vector<Light> lights;
-	std::vector<Renderable*> render_objects;
+	std::vector<SphereRef> spheres;
+	std::vector<LightRef> lights;
+	std::vector<RenderableRef> render_objects;
 	setupScene(spheres, lights, render_objects);
 
 	SDL_Window* window = NULL;
@@ -303,22 +307,22 @@ int main(int argc, char* args[])
 								quit = true;
 								break;
 							case SDLK_e:
-								lights[0].translate(0.0f, 0.0f, -0.1f);
+								lights[0]->translate(0.0f, 0.0f, -0.1f);
 								break;
 							case SDLK_d:
-								lights[0].translate(0.0f, 0.0f, 0.1f);
+								lights[0]->translate(0.0f, 0.0f, 0.1f);
 								break;
 							case SDLK_s:
-								lights[0].translate(-0.1f, 0.0f, 0.0f);
+								lights[0]->translate(-0.1f, 0.0f, 0.0f);
 								break;
 							case SDLK_f:
-								lights[0].translate(0.1f, 0.0f, 0.0f);
+								lights[0]->translate(0.1f, 0.0f, 0.0f);
 								break;
 							case SDLK_q:
-								lights[0].translate(0.0f, 0.1f, 0.0f);
+								lights[0]->translate(0.0f, 0.1f, 0.0f);
 								break;
 							case SDLK_a:
-								lights[0].translate(0.0f, -0.1f, 0.0f);
+								lights[0]->translate(0.0f, -0.1f, 0.0f);
 								break;
 						}
 					}
