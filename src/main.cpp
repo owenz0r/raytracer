@@ -1,10 +1,16 @@
+#ifdef __WINDOWS__
 #include "SDL.h"
 #include "glm.hpp"
+#else
+#include <SDL2/SDL.h>
+#include "glm/glm.hpp"
+#endif
 
 #include <stdio.h>
 #include <math.h>
 #include <iostream>
 #include <vector>
+#include <chrono>
 
 #define PI 3.141592653589793
 
@@ -19,18 +25,20 @@ class Ray {
 public:
 	Ray(glm::vec3 origin, glm::vec3 direction)
 		: m_origin(origin), m_direction(direction) {}
+	Ray()
+		: m_origin(glm::vec3(0)), m_direction(glm::vec3(0)) {}
 
-	glm::vec3 origin() const { return m_origin; }
-	glm::vec3 direction() const { return m_direction; }
+	const glm::vec3& origin() const { return m_origin; }
+	const glm::vec3& direction() const { return m_direction; }
 };
 
 class Renderable {
 public:
 	virtual float intersect(const Ray &ray) const = 0;
-	virtual glm::vec3 position() const = 0;
-	virtual glm::vec3 colour() const = 0;
-	virtual float diffuse() const = 0;
-	virtual float specular() const = 0;
+	virtual const glm::vec3& position() const = 0;
+	virtual const glm::vec3& colour() const = 0;
+	virtual const float& diffuse() const = 0;
+	virtual const float& specular() const = 0;
 };
 
 typedef std::shared_ptr<Renderable> RenderableRef;
@@ -49,23 +57,21 @@ public:
 			m_diffuse(diffuse), m_specular(specular) {}
 
 	Sphere(float radius, glm::vec3 position, glm::vec3 colour)
-		: m_radius(radius), m_position(position), m_colour(colour)
-	{
-		m_diffuse = 1.0f;
-		m_specular = 0.0f;
-	}
+		: m_radius(radius), m_position(position), m_colour(colour),
+		m_diffuse(1.0f), m_specular(0.0f) {}
 
 	float intersect( const Ray &ray ) const {
-		glm::vec3 op = m_position - ray.origin();
-		float t, eps = 1e-4;
-		float b = glm::dot(op, ray.direction());
+		const glm::vec3 op = m_position - ray.origin();
+		constexpr float eps = 1e-4;
+		const float b = glm::dot(op, ray.direction());
 		float det = b*b - glm::dot(op, op) + m_radius * m_radius;
 		if (det < 0) {
 			return 0;
 		} else {
 			det = sqrt(det);
 		}
-
+		
+		float t;
 		if ((t = b - det) > eps) {
 			return t;
 		} else {
@@ -85,11 +91,11 @@ public:
 		m_position += trans;
 	}
 
-	float radius() const { return m_radius; }
-	glm::vec3 position() const { return m_position; }
-	glm::vec3 colour() const { return m_colour; }
-	float diffuse() const { return m_diffuse; }
-	float specular() const { return m_specular; }
+	const float& radius() const { return m_radius; }
+	const glm::vec3& position() const { return m_position; }
+	const glm::vec3& colour() const { return m_colour; }
+	const float& diffuse() const { return m_diffuse; }
+	const float& specular() const { return m_specular; }
 };
 
 typedef std::shared_ptr<Sphere> SphereRef;
@@ -101,12 +107,18 @@ public:
 	Light(float intensity, glm::vec3 position)
 		: Sphere(0.05f, position, glm::vec3(255, 255, 0)), m_intensity(intensity) {};
 
-	float intensity() const { return m_intensity; }
+	const float& intensity() const { return m_intensity; }
 };
 
 typedef std::shared_ptr<Light> LightRef;
 
-void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned short g, unsigned short b, unsigned short a=255)
+void setPixel(const SDL_Surface *surface,
+			  const int x,
+			  const int y,
+			  const unsigned short r,
+			  const unsigned short g,
+			  const unsigned short b,
+			  const unsigned short a=255)
 {
 	Uint32 pixel, alpha, red, green, blue;
 	pixel = alpha = red = green = blue = 0;
@@ -125,39 +137,44 @@ void setPixel(SDL_Surface *surface, int x, int y, unsigned short r, unsigned sho
 	pixels[(y * surface->w) + x] = pixel;
 }
 
-void setupScene(std::vector<SphereRef> &spheres, std::vector<LightRef> &lights, std::vector<RenderableRef> &render_objects)
+void setupScene(std::vector<Sphere> &spheres, std::vector<Light> &lights, std::vector<Renderable*> &render_objects)
 {
-	spheres.push_back(std::make_shared<Sphere>(1.0, glm::vec3(0, 0, -10), glm::vec3(255, 0, 0)));
-	spheres.push_back(std::make_shared<Sphere>(0.5, glm::vec3(-1.5, -0.5, -8), glm::vec3(0, 255, 0)));
-	spheres.push_back(std::make_shared<Sphere>(0.5, glm::vec3(1, -0.5, -6), glm::vec3(0, 0, 255)));
+	spheres.push_back(Sphere(1.0, glm::vec3(0, 0, -10), glm::vec3(255, 0, 0)));
+	spheres.push_back(Sphere(0.5, glm::vec3(-1.5, -0.5, -8), glm::vec3(0, 255, 0)));
+	spheres.push_back(Sphere(0.5, glm::vec3(1, -0.5, -6), glm::vec3(0, 0, 255)));
 	// walls
-	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(0, -501, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
-	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(-503, 0, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
-	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(0, 0, -515), glm::vec3(200, 200, 200), 1.0f, 0.3f));
-	spheres.push_back(std::make_shared<Sphere>(500.0, glm::vec3(503, 0, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
+	spheres.push_back(Sphere(500.0, glm::vec3(0, -501, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
+	spheres.push_back(Sphere(500.0, glm::vec3(-503, 0, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
+	spheres.push_back(Sphere(500.0, glm::vec3(0, 0, -515), glm::vec3(200, 200, 200), 1.0f, 0.3f));
+	spheres.push_back(Sphere(500.0, glm::vec3(503, 0, -10), glm::vec3(200, 200, 200), 1.0f, 0.3f));
 
-	lights.push_back(std::make_shared<Light>(1.0f, glm::vec3(-1, 1, -5)));
+	lights.push_back(Light(1.0f, glm::vec3(-1, 1, -5)));
 
-	for (auto sphere : spheres)
-		render_objects.push_back(sphere);
-	for (auto light : lights)
-		render_objects.push_back(light);
+	for (auto &sphere : spheres)
+		render_objects.push_back(&sphere);
+	for (auto &light : lights)
+		render_objects.push_back(&light);
 }
 
-Ray createCameraRay(int x, int y, float invWidth, float invHeight, float aspectratio, float angle)
+const Ray createCameraRay(const int x,
+                    const int y,
+                    const float invWidth,
+                    const float invHeight,
+                    const float aspectratio,
+                    const float angle)
 {
-	float xx = (2 * ((x + 0.5) * invWidth) - 1) * angle * aspectratio;
-	float yy = (1 - 2 * ((y + 0.5) * invHeight)) * angle;
-	glm::vec3 raydir(xx, yy, -1);
-	raydir = glm::normalize(raydir);
-	Ray ray(glm::vec3(0, 0, 0), raydir);
-	return ray;
+	const float xx = (2 * ((x + 0.5) * invWidth) - 1) * angle * aspectratio;
+	const float yy = (1 - 2 * ((y + 0.5) * invHeight)) * angle;
+	const glm::vec3 raydir(xx, yy, -1);
+	return Ray(glm::vec3(0, 0, 0), glm::normalize(raydir));
 }
 
-RenderableRef findClosestObject(std::vector<RenderableRef> &render_objects, Ray &ray, float &closest_dist)
+Renderable* findClosestObject(const std::vector<Renderable*> &render_objects,
+                                const Ray &ray,
+                                float &closest_dist)
 {
 	float dist = 0.0f;
-	RenderableRef closest;
+    Renderable* closest = nullptr;
 	// loop render objects
 	for (auto object : render_objects) {
 		dist = object->intersect(ray);
@@ -170,14 +187,15 @@ RenderableRef findClosestObject(std::vector<RenderableRef> &render_objects, Ray 
 	return closest;
 }
 
-bool isInShadow(std::vector<SphereRef> &spheres, Ray &lightray, float lightdir_length)
+bool isInShadow(const std::vector<Sphere> &spheres,
+				const Ray &lightray,
+				const float lightdir_length)
 {
 	// shadow check
 	bool in_shadow = false;
-	//for (std::vector<Sphere>::iterator sphere = spheres.begin(); sphere < spheres.end(); ++sphere)
 	for (auto sphere : spheres)
 	{
-		float dist = sphere->intersect(lightray);
+		float dist = sphere.intersect(lightray);
 		if (dist > 0 && dist < lightdir_length)
 		{
 			in_shadow = true;
@@ -187,33 +205,33 @@ bool isInShadow(std::vector<SphereRef> &spheres, Ray &lightray, float lightdir_l
 	return in_shadow;
 }
 
-void calcIllumination(std::vector<LightRef> &lights, 
-							std::vector<SphereRef> &spheres,
-							Ray &ray,
-							RenderableRef closest, 
-							glm::vec3 &contact_point, 
-							glm::vec3 &sphere_normal,
-							float &diffuse,
-							float & specular)
+void calcIllumination(const std::vector<Light> &lights,
+					  const std::vector<Sphere> &spheres,
+					  const Ray &ray,
+					  const Renderable* closest,
+					  const glm::vec3 &contact_point,
+					  const glm::vec3 &sphere_normal,
+					  float &diffuse,
+					  float & specular)
 {
 	// check lights on contact point
 	for (auto light : lights)
 	{
-		glm::vec3 lightdir(contact_point - light->position());
-		glm::vec3 lightdir_normalized = glm::normalize(lightdir);
-		float lightdir_length = glm::length(lightdir);
-		Ray lightray(light->position(), lightdir_normalized);
+		const glm::vec3 lightdir(contact_point - light.position());
+		const glm::vec3 lightdir_normalized = glm::normalize(lightdir);
+		const float lightdir_length = glm::length(lightdir);
+		const Ray lightray(light.position(), lightdir_normalized);
 
 		// shadow check
 		if (!isInShadow(spheres, lightray, lightdir_length))
 		{
-			diffuse += abs(glm::dot(lightdir_normalized, glm::normalize(contact_point - closest->position())) * light->intensity());
+			diffuse += abs(glm::dot(lightdir_normalized, glm::normalize(contact_point - closest->position())) * light.intensity());
 			specular += glm::pow(glm::dot(ray.direction(), glm::reflect(lightdir_normalized, sphere_normal)), 20);
 		}
 	}
 }
 
-glm::vec3 calcFinalColour(RenderableRef closest, float specular, float diffuse)
+glm::vec3 calcFinalColour(Renderable* closest, float specular, float diffuse)
 {
 	float diffuse_scale = 1.0f;
 	float specular_scale = 0.6f;
@@ -225,20 +243,28 @@ glm::vec3 calcFinalColour(RenderableRef closest, float specular, float diffuse)
 	return final_colour;
 }
 
-void raytrace(SDL_Surface* screenSurface, std::vector<SphereRef> &spheres, std::vector<LightRef> &lights, std::vector<RenderableRef> &render_objects)
+void raytrace(const SDL_Surface* screenSurface,
+			  const std::vector<Ray> &rays,
+			  const std::vector<Sphere> &spheres,
+			  const std::vector<Light> &lights,
+			  const std::vector<Renderable*> &render_objects)
 {
-	float invWidth = 1 / float(SCREEN_WIDTH), invHeight = 1 / float(SCREEN_HEIGHT);
-	float fov = 30, aspectratio = SCREEN_WIDTH / float(SCREEN_HEIGHT);
-	float angle = tan(PI * 0.5 * fov / 180.0);
+	std::chrono::microseconds findClosestObj_duration(0);
+	std::chrono::microseconds calcIllumination_duration(0);
+	std::chrono::microseconds calcFinalColour_duration(0);
 
 	for (int y = 0; y < SCREEN_HEIGHT; ++y)
 	{
+		const unsigned stride = SCREEN_WIDTH * y;
 		for (int x = 0; x < SCREEN_WIDTH; ++x)
 		{
-			Ray ray = createCameraRay(x, y, invWidth, invHeight, aspectratio, angle);
-
+			const Ray& ray = rays[stride + x];
+			
 			float closest_dist = std::numeric_limits<float>::max();
-			RenderableRef closest = findClosestObject(render_objects, ray, closest_dist);
+			auto findClosestObj_t1 = std::chrono::high_resolution_clock::now();
+			Renderable* closest = findClosestObject(render_objects, ray, closest_dist);
+			auto findClosestObj_t2 = std::chrono::high_resolution_clock::now();
+			findClosestObj_duration += std::chrono::duration_cast<std::chrono::microseconds>(findClosestObj_t2 - findClosestObj_t1);
 
 			// found closest sphere to draw
 			if (closest)
@@ -249,20 +275,34 @@ void raytrace(SDL_Surface* screenSurface, std::vector<SphereRef> &spheres, std::
 				contact_point = contact_point + (bias * sphere_normal);
 
 				float specular = 0.0f, diffuse = 0.0f;
+				
+				auto calcIllumination_t1 = std::chrono::high_resolution_clock::now();
 				calcIllumination(lights, spheres, ray, closest, contact_point, sphere_normal, diffuse, specular);
+				auto calcIllumination_t2 = std::chrono::high_resolution_clock::now();
+				
+				calcIllumination_duration += std::chrono::duration_cast<std::chrono::microseconds>(calcIllumination_t2 - calcIllumination_t1);
+				//std::cout << "calcIllumination - " << duration << " ms" << std::endl;
 
+				auto calcFinalColour_t1 = std::chrono::high_resolution_clock::now();
 				glm::vec3 final_colour = calcFinalColour(closest, specular, diffuse);
 				setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
+				auto calcFinalColour_t2 = std::chrono::high_resolution_clock::now();
+				
+				calcFinalColour_duration += std::chrono::duration_cast<std::chrono::microseconds>(calcFinalColour_t2 - calcFinalColour_t1);
 			}
 		}
 	}
+	
+	//std::cout << "findClosestObj - " << findClosestObj_duration.count() << " ms" << "\n";
+	//std::cout << "calcIllumination - " << calcIllumination_duration.count() << " ms" << "\n";
+	//std::cout << "calcFinalColour - " << calcFinalColour_duration.count() << " ms" << "\n";
 }
 
 int main(int argc, char* args[])
 {
-	std::vector<SphereRef> spheres;
-	std::vector<LightRef> lights;
-	std::vector<RenderableRef> render_objects;
+	std::vector<Sphere> spheres;
+	std::vector<Light> lights;
+	std::vector<Renderable*> render_objects;
 	setupScene(spheres, lights, render_objects);
 
 	SDL_Window* window = NULL;
@@ -284,12 +324,33 @@ int main(int argc, char* args[])
 		{
 			screenSurface = SDL_GetWindowSurface(window);
 			renderer = SDL_GetRenderer(window);
+			
+			constexpr auto num_pixels = SCREEN_WIDTH * SCREEN_HEIGHT;
+			std::vector<Ray> rays;
+			rays.resize(num_pixels);
+			
+			constexpr float invWidth = 1 / float(SCREEN_WIDTH), invHeight = 1 / float(SCREEN_HEIGHT);
+			constexpr float fov = 30, aspectratio = SCREEN_WIDTH / float(SCREEN_HEIGHT);
+            const float angle = tan(PI * 0.5 * fov / 180.0);
+			
+			for (int y = 0; y < SCREEN_HEIGHT; ++y)
+			{
+				const unsigned stride = SCREEN_WIDTH * y;
+				for (int x = 0; x < SCREEN_WIDTH; ++x)
+					rays[stride + x] = createCameraRay(x, y, invWidth, invHeight, aspectratio, angle);
+			}
 
 			bool quit = false;
 			SDL_Event e;
 			while (!quit) 
 			{
-				raytrace(screenSurface, spheres, lights, render_objects);
+				auto t1 = std::chrono::high_resolution_clock::now();
+				raytrace(screenSurface, rays, spheres, lights, render_objects);
+				auto t2 = std::chrono::high_resolution_clock::now();
+				
+				auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+				std::cout << "Raytrace - " << duration << " ms" << "\n";
+				
 				SDL_UpdateWindowSurface(window);
 
 				// poll events
@@ -307,22 +368,22 @@ int main(int argc, char* args[])
 								quit = true;
 								break;
 							case SDLK_e:
-								lights[0]->translate(0.0f, 0.0f, -0.1f);
+								lights[0].translate(0.0f, 0.0f, -0.1f);
 								break;
 							case SDLK_d:
-								lights[0]->translate(0.0f, 0.0f, 0.1f);
+								lights[0].translate(0.0f, 0.0f, 0.1f);
 								break;
 							case SDLK_s:
-								lights[0]->translate(-0.1f, 0.0f, 0.0f);
+								lights[0].translate(-0.1f, 0.0f, 0.0f);
 								break;
 							case SDLK_f:
-								lights[0]->translate(0.1f, 0.0f, 0.0f);
+								lights[0].translate(0.1f, 0.0f, 0.0f);
 								break;
 							case SDLK_q:
-								lights[0]->translate(0.0f, 0.1f, 0.0f);
+								lights[0].translate(0.0f, 0.1f, 0.0f);
 								break;
 							case SDLK_a:
-								lights[0]->translate(0.0f, -0.1f, 0.0f);
+								lights[0].translate(0.0f, -0.1f, 0.0f);
 								break;
 						}
 					}
