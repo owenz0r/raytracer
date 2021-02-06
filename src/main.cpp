@@ -11,11 +11,14 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <thread>
 
 #define PI 3.141592653589793
 
-const int SCREEN_WIDTH = 1024;
-const int SCREEN_HEIGHT = 768;
+constexpr auto SCREEN_WIDTH = 1280;
+constexpr auto SCREEN_HEIGHT = 720;
+
+constexpr auto NUM_THREADS = 8;
 
 
 class Ray {
@@ -249,53 +252,43 @@ void raytrace(const SDL_Surface* screenSurface,
 			  const std::vector<Light> &lights,
 			  const std::vector<Renderable*> &render_objects)
 {
-	std::chrono::microseconds findClosestObj_duration(0);
-	std::chrono::microseconds calcIllumination_duration(0);
-	std::chrono::microseconds calcFinalColour_duration(0);
-
-	for (int y = 0; y < SCREEN_HEIGHT; ++y)
-	{
-		const unsigned stride = SCREEN_WIDTH * y;
-		for (int x = 0; x < SCREEN_WIDTH; ++x)
+	auto process = [&](const int start, const int end) {
+		for (int y = start; y < end; ++y)
 		{
-			const Ray& ray = rays[stride + x];
-			
-			float closest_dist = std::numeric_limits<float>::max();
-			auto findClosestObj_t1 = std::chrono::high_resolution_clock::now();
-			Renderable* closest = findClosestObject(render_objects, ray, closest_dist);
-			auto findClosestObj_t2 = std::chrono::high_resolution_clock::now();
-			findClosestObj_duration += std::chrono::duration_cast<std::chrono::microseconds>(findClosestObj_t2 - findClosestObj_t1);
-
-			// found closest sphere to draw
-			if (closest)
+			const unsigned stride = SCREEN_WIDTH * y;
+			for (int x = 0; x < SCREEN_WIDTH; ++x)
 			{
-				float bias = 1e-4;
-				glm::vec3 contact_point(ray.origin() + (ray.direction() * closest_dist));
-				glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
-				contact_point = contact_point + (bias * sphere_normal);
+				const Ray& ray = rays[stride + x];
+				float closest_dist = std::numeric_limits<float>::max();
+				Renderable* closest = findClosestObject(render_objects, ray, closest_dist);
 
-				float specular = 0.0f, diffuse = 0.0f;
-				
-				auto calcIllumination_t1 = std::chrono::high_resolution_clock::now();
-				calcIllumination(lights, spheres, ray, closest, contact_point, sphere_normal, diffuse, specular);
-				auto calcIllumination_t2 = std::chrono::high_resolution_clock::now();
-				
-				calcIllumination_duration += std::chrono::duration_cast<std::chrono::microseconds>(calcIllumination_t2 - calcIllumination_t1);
-				//std::cout << "calcIllumination - " << duration << " ms" << std::endl;
+				// found closest sphere to draw
+				if (closest)
+				{
+					float bias = 1e-4;
+					glm::vec3 contact_point(ray.origin() + (ray.direction() * closest_dist));
+					glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
+					contact_point = contact_point + (bias * sphere_normal);
 
-				auto calcFinalColour_t1 = std::chrono::high_resolution_clock::now();
-				glm::vec3 final_colour = calcFinalColour(closest, specular, diffuse);
-				setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
-				auto calcFinalColour_t2 = std::chrono::high_resolution_clock::now();
-				
-				calcFinalColour_duration += std::chrono::duration_cast<std::chrono::microseconds>(calcFinalColour_t2 - calcFinalColour_t1);
+					float specular = 0.0f, diffuse = 0.0f;
+					calcIllumination(lights, spheres, ray, closest, contact_point, sphere_normal, diffuse, specular);
+
+					glm::vec3 final_colour = calcFinalColour(closest, specular, diffuse);
+					setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
+				}
 			}
 		}
-	}
+	};
 	
-	//std::cout << "findClosestObj - " << findClosestObj_duration.count() << " ms" << "\n";
-	//std::cout << "calcIllumination - " << calcIllumination_duration.count() << " ms" << "\n";
-	//std::cout << "calcFinalColour - " << calcFinalColour_duration.count() << " ms" << "\n";
+	constexpr int rows_per_thread = SCREEN_HEIGHT / NUM_THREADS;
+	std::vector<std::thread> threads;
+	threads.resize(NUM_THREADS);
+	
+	for (int i=0; i < NUM_THREADS; ++i)
+		threads[i] = std::thread(process, rows_per_thread * i, std::min(rows_per_thread * (i+1), SCREEN_HEIGHT));
+	
+	for (int i=0; i < NUM_THREADS; ++i)
+		threads[i].join();
 }
 
 int main(int argc, char* args[])
