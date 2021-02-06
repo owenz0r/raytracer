@@ -13,7 +13,7 @@
 #include <chrono>
 #include <thread>
 
-#define PI 3.141592653589793
+#define PI 3.141592653589793f
 
 constexpr auto SCREEN_WIDTH = 1280;
 constexpr auto SCREEN_HEIGHT = 720;
@@ -65,7 +65,7 @@ public:
 
 	float intersect( const Ray &ray ) const {
 		const glm::vec3 op = m_position - ray.origin();
-		constexpr float eps = 1e-4;
+		constexpr float eps = 1e-4f;
 		const float b = glm::dot(op, ray.direction());
 		float det = b*b - glm::dot(op, op) + m_radius * m_radius;
 		if (det < 0) {
@@ -166,8 +166,8 @@ const Ray createCameraRay(const int x,
                     const float aspectratio,
                     const float angle)
 {
-	const float xx = (2 * ((x + 0.5) * invWidth) - 1) * angle * aspectratio;
-	const float yy = (1 - 2 * ((y + 0.5) * invHeight)) * angle;
+	const float xx = (2.0f * ((x + 0.5f) * invWidth) - 1.0f) * angle * aspectratio;
+	const float yy = (1.0f - 2.0f * ((y + 0.5f) * invHeight)) * angle;
 	const glm::vec3 raydir(xx, yy, -1);
 	return Ray(glm::vec3(0, 0, 0), glm::normalize(raydir));
 }
@@ -229,7 +229,7 @@ void calcIllumination(const std::vector<Light> &lights,
 		if (!isInShadow(spheres, lightray, lightdir_length))
 		{
 			diffuse += abs(glm::dot(lightdir_normalized, glm::normalize(contact_point - closest->position())) * light.intensity());
-			specular += glm::pow(glm::dot(ray.direction(), glm::reflect(lightdir_normalized, sphere_normal)), 20);
+			specular += glm::pow(glm::dot(ray.direction(), glm::reflect(lightdir_normalized, sphere_normal)), 20.0f);
 		}
 	}
 }
@@ -265,7 +265,7 @@ void raytrace(const SDL_Surface* screenSurface,
 				// found closest sphere to draw
 				if (closest)
 				{
-					float bias = 1e-4;
+					float bias = 1e-4f;
 					glm::vec3 contact_point(ray.origin() + (ray.direction() * closest_dist));
 					glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
 					contact_point = contact_point + (bias * sphere_normal);
@@ -274,7 +274,7 @@ void raytrace(const SDL_Surface* screenSurface,
 					calcIllumination(lights, spheres, ray, closest, contact_point, sphere_normal, diffuse, specular);
 
 					glm::vec3 final_colour = calcFinalColour(closest, specular, diffuse);
-					setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
+					setPixel(screenSurface, x, y, static_cast<unsigned short>(final_colour.x), static_cast<unsigned short>(final_colour.y), static_cast<unsigned short>(final_colour.z));
 				}
 			}
 		}
@@ -324,7 +324,7 @@ int main(int argc, char* args[])
 			
 			constexpr float invWidth = 1 / float(SCREEN_WIDTH), invHeight = 1 / float(SCREEN_HEIGHT);
 			constexpr float fov = 30, aspectratio = SCREEN_WIDTH / float(SCREEN_HEIGHT);
-            const float angle = tan(PI * 0.5 * fov / 180.0);
+            const float angle = tan(PI * 0.5f * fov / 180.0f);
 			
 			for (int y = 0; y < SCREEN_HEIGHT; ++y)
 			{
