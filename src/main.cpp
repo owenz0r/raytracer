@@ -13,12 +13,22 @@
 #include <chrono>
 #include <thread>
 
+#include <queue>
+#include <functional>
+#include <array>
+#include <mutex>
+
+auto jobQueue = std::queue<std::function<void()>>();
+auto workers = std::array<std::thread, 4>();
+std::mutex queue_mutex;
+std::atomic<int> busy {0};
+
 #define PI 3.141592653589793
 
 constexpr auto SCREEN_WIDTH = 1280;
 constexpr auto SCREEN_HEIGHT = 720;
 
-constexpr auto NUM_THREADS = 8;
+constexpr auto NUM_THREADS = 4;
 
 
 class Ray {
@@ -252,43 +262,58 @@ void raytrace(const SDL_Surface* screenSurface,
 			  const std::vector<Light> &lights,
 			  const std::vector<Renderable*> &render_objects)
 {
-	auto process = [&](const int start, const int end) {
-		for (int y = start; y < end; ++y)
-		{
-			const unsigned stride = SCREEN_WIDTH * y;
-			for (int x = 0; x < SCREEN_WIDTH; ++x)
+	constexpr int rows_per_thread = SCREEN_HEIGHT / NUM_THREADS;
+	
+	for (int i=0; i < NUM_THREADS; ++i)
+	{
+		int start = rows_per_thread * i;
+		int end = std::min(rows_per_thread * (i+1), SCREEN_HEIGHT);
+		
+		auto process = [start, end, &rays, &render_objects, &lights, &spheres, screenSurface]() {
+			for (int y = start; y < end; ++y)
 			{
-				const Ray& ray = rays[stride + x];
-				float closest_dist = std::numeric_limits<float>::max();
-				Renderable* closest = findClosestObject(render_objects, ray, closest_dist);
-
-				// found closest sphere to draw
-				if (closest)
+				const unsigned stride = SCREEN_WIDTH * y;
+				for (int x = 0; x < SCREEN_WIDTH; ++x)
 				{
-					float bias = 1e-4;
-					glm::vec3 contact_point(ray.origin() + (ray.direction() * closest_dist));
-					glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
-					contact_point = contact_point + (bias * sphere_normal);
+					const Ray& ray = rays[stride + x];
+					float closest_dist = std::numeric_limits<float>::max();
+					Renderable* closest = findClosestObject(render_objects, ray, closest_dist);
 
-					float specular = 0.0f, diffuse = 0.0f;
-					calcIllumination(lights, spheres, ray, closest, contact_point, sphere_normal, diffuse, specular);
+					// found closest sphere to draw
+					if (closest)
+					{
+						float bias = 1e-4;
+						glm::vec3 contact_point(ray.origin() + (ray.direction() * closest_dist));
+						glm::vec3 sphere_normal = glm::normalize(contact_point - closest->position());
+						contact_point = contact_point + (bias * sphere_normal);
 
-					glm::vec3 final_colour = calcFinalColour(closest, specular, diffuse);
-					setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
+						float specular = 0.0f, diffuse = 0.0f;
+						calcIllumination(lights, spheres, ray, closest, contact_point, sphere_normal, diffuse, specular);
+
+						glm::vec3 final_colour = calcFinalColour(closest, specular, diffuse);
+						setPixel(screenSurface, x, y, final_colour.x, final_colour.y, final_colour.z);
+					}
 				}
 			}
-		}
-	};
+		};
+		
+		jobQueue.push(process);
+	}
 	
-	constexpr int rows_per_thread = SCREEN_HEIGHT / NUM_THREADS;
+	
+	while ( busy > 0 ) {};
+	
+	/*
 	std::vector<std::thread> threads;
 	threads.resize(NUM_THREADS);
+	
 	
 	for (int i=0; i < NUM_THREADS; ++i)
 		threads[i] = std::thread(process, rows_per_thread * i, std::min(rows_per_thread * (i+1), SCREEN_HEIGHT));
 	
 	for (int i=0; i < NUM_THREADS; ++i)
 		threads[i].join();
+	*/
 }
 
 int main(int argc, char* args[])
@@ -297,6 +322,35 @@ int main(int argc, char* args[])
 	std::vector<Light> lights;
 	std::vector<Renderable*> render_objects;
 	setupScene(spheres, lights, render_objects);
+	
+	int first = 10;
+	int second = 100;
+	auto f = [](int, int) -> void {};
+	f(first, second);
+	
+	//jobQueue.push([](int, int) -> void {});
+	
+	auto doWork = [](){
+		while(true) {
+			if (jobQueue.size() > 0){
+				busy++;
+				std::function<void()> j;
+				{
+					const std::lock_guard<std::mutex> lock(queue_mutex);
+					j = jobQueue.front();
+					jobQueue.pop();
+				}
+				j();
+				busy--;
+			}
+		}
+	};
+	workers[0] = std::thread(doWork);
+	workers[1] = std::thread(doWork);
+	workers[2] = std::thread(doWork);
+	workers[3] = std::thread(doWork);
+	//workers[4] = std::thread(doWork);
+	//workers[5] = std::thread(doWork);
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
