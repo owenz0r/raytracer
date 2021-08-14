@@ -1,6 +1,7 @@
 #ifdef __WINDOWS__
 #include "SDL.h"
 #include "glm.hpp"
+#undef main
 #else
 #include <SDL2/SDL.h>
 #include "glm/glm.hpp"
@@ -28,7 +29,7 @@ std::atomic<int> busy {0};
 constexpr auto SCREEN_WIDTH = 1280;
 constexpr auto SCREEN_HEIGHT = 720;
 
-constexpr auto NUM_THREADS = 4;
+constexpr auto NUM_THREADS = 8;
 
 
 class Ray {
@@ -349,8 +350,6 @@ int main(int argc, char* args[])
 	workers[1] = std::thread(doWork);
 	workers[2] = std::thread(doWork);
 	workers[3] = std::thread(doWork);
-	//workers[4] = std::thread(doWork);
-	//workers[5] = std::thread(doWork);
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
