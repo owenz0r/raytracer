@@ -18,18 +18,23 @@
 #include <functional>
 #include <array>
 #include <mutex>
+#include <condition_variable>
+
+constexpr auto NUM_THREADS = 8;
 
 auto jobQueue = std::queue<std::function<void()>>();
-auto workers = std::array<std::thread, 4>();
+auto workers = std::array<std::thread, NUM_THREADS>();
 std::mutex queue_mutex;
-std::atomic<int> busy {0};
+std::condition_variable queue_condvar;
+std::atomic<int> finished {0};
+bool start_frame = false;
 
 #define PI 3.141592653589793
 
 constexpr auto SCREEN_WIDTH = 1280;
 constexpr auto SCREEN_HEIGHT = 720;
 
-constexpr auto NUM_THREADS = 8;
+
 
 
 class Ray {
@@ -299,10 +304,19 @@ void raytrace(const SDL_Surface* screenSurface,
 		};
 		
 		jobQueue.push(process);
+		queue_condvar.notify_one();
 	}
 	
+	//start_frame = true;
+	//queue_condvar.notify_all();
 	
-	while ( busy > 0 ) {};
+	//std::unique_lock<std::mutex> mlock(queue_mutex);
+	//queue_condvar.wait(mlock, [] { return finished == NUM_THREADS; });
+	//start_frame = false;
+	//finished = 0;
+
+	while (finished < NUM_THREADS) { SDL_Delay(1); };
+	finished = 0;
 	
 	/*
 	std::vector<std::thread> threads;
@@ -316,6 +330,14 @@ void raytrace(const SDL_Surface* screenSurface,
 		threads[i].join();
 	*/
 }
+
+/*
+void* operator new(size_t size)
+{
+	std::cout << "Allocating " << size << " bytes" << std::endl;
+	return malloc(size);
+}
+*/
 
 int main(int argc, char* args[])
 {
@@ -332,17 +354,27 @@ int main(int argc, char* args[])
 	//jobQueue.push([](int, int) -> void {});
 	
 	auto doWork = [](){
+
+		std::function<void()> j;
 		while(true) {
-			if (jobQueue.size() > 0){
-				busy++;
-				std::function<void()> j;
-				{
-					const std::lock_guard<std::mutex> lock(queue_mutex);
+
+			std::unique_lock<std::mutex> lock(queue_mutex);
+			queue_condvar.wait(lock);
+
+			{
+				//const std::lock_guard<std::mutex> lock(queue_mutex);
+				if (jobQueue.size() > 0){
+					//busy++;
 					j = jobQueue.front();
 					jobQueue.pop();
 				}
+			}
+			if (j) {
 				j();
-				busy--;
+				//busy--;
+				finished++;
+				//queue_condvar.notify_all();
+				j = nullptr;
 			}
 		}
 	};
@@ -350,6 +382,10 @@ int main(int argc, char* args[])
 	workers[1] = std::thread(doWork);
 	workers[2] = std::thread(doWork);
 	workers[3] = std::thread(doWork);
+	workers[4] = std::thread(doWork);
+	workers[5] = std::thread(doWork);
+	workers[6] = std::thread(doWork);
+	workers[7] = std::thread(doWork);
 
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
